@@ -42,6 +42,8 @@ baseball = baseball %>% mutate(AVG = CH/CAB,
 
 Finally, I cleaned the `Position` and `Years` explanatory variables through reimpementing them as dummy variables.
 
+According to Fox's description of his analysis, he mentions **middle infielders** as players who consistently played second base or shortstop so I classified all individuals with either position as such. 
+
 ```{r dummy.vars.position}
 new.pos = c()
 MI = c("12", "1S", "23", "2B", "2S", "3S", "O2", "SS")
@@ -95,7 +97,7 @@ Firstly, I'll look at the the structure of the data itself and how the different
 - `CRBI` = Career runs batted in
 
 ```{r}
-pairs(~ G.x + InnOuts + PO + E + CAB + CR + CRBI, data = new.baseball)
+pairs(salary ~ G.x + InnOuts + PO + E + CAB + CR + CRBI, data = new.baseball)
 ```
 
 From observing the paired structures of data it is evident that some features are uncorrelated whereas others are strongly correlated. However, this is mostly expected as certain features relate to one another. For example, a player's career at bats would be associated with his career runs or career runs batted in since all tie into a players capability of scoring bases.
