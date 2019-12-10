@@ -65,29 +65,54 @@ neg.cont  = 6
 neg.sal   = 3
 
 for (i in baseball$years){
-  if      (i >= neg.cont) { new.years = c(new.years, "negotiate.contract") }
-  else if (i >= neg.sal)  { new.years = c(new.years, "negotiate.salary")   }
-  else                    { new.years = c(new.years, "other")              }
+  if      (i >= neg.cont) { new.years = c(new.years, "neg.contract") }
+  else if (i >= neg.sal)  { new.years = c(new.years, "neg.salary")   }
+  else                    { new.years = c(new.years, "other")        }
 }
 
 baseball$years = relevel(factor(new.years), "other")
 ```
 
 ```{r}
-lm.fit = lm(log(salary) ~ ., data = baseball)
+lm.fit = lm(salary ~ ., data = baseball)
 new.baseball = as_tibble(model.matrix(lm.fit)[,-1])
 new.baseball$salary = baseball$salary
 ```
 
 \newpage
 
-### 3)
+Now that we have completed the feature creation process, the next step is to analyze the data itself. 
+
+Firstly, I'll look at the the structure of the data itself and how the different variables are associated with each other. Since there are a lot of explanatory variables within the data, I will select a few key variables I believe to be the most influential in the model and investigate the structure.
+
+**Note:**
+- `G.x` = Position played at specified position
+- `InnOut` = Time played in the field expressed as outs
+- `PO` = Putouts
+- `E` = Errors
+- `CAB` = Career at bats
+- `CR` = Career runs
+- `CRBI` = Career runs batted in
 
 ```{r}
-
+pairs(~ G.x + InnOuts + PO + E + CAB + CR + CRBI, data = new.baseball)
 ```
 
-\newpage
+From observing the paired structures of data it is evident that some features are uncorrelated whereas others are strongly correlated. However, this is mostly expected as certain features relate to one another. For example, a player's career at bats would be associated with his career runs or career runs batted in since all tie into a players capability of scoring bases.
+
+This indicates a possible issue in inference of coefficients through linear modeling since the standard error calculation will be grossly inflated.
+
+Next, I'd like to look into whether the data is distributed normally as per an assumption of guassian distributed errors in linear modelling. 
+
+```{r}
+ggplot(data = new.baseball, aes(x = salary)) + geom_histogram(bins = 40)
+```
+
+The histogram above shows that the observed outcome values are not distributed normally at all. Hence, some sort of transformation of the data is necessary in order to use linear modelling.
+
+```{r}
+ggplot(data = new.baseball, aes(x = log(salary))) + geom_histogram(bins = 40)
+```
 
 \newpage
 
@@ -96,7 +121,12 @@ new.baseball$salary = baseball$salary
 ### 1)
 
 ```{r}
-
+lm(log(salary) ~ yearsneg.contract +
+     yearsneg.salary + 
+     log(1+CR) + 
+     yearsneg.contract*log(1+CR) + 
+     yearsneg.salary*log(1+CR), 
+   data = new.baseball)
 ```
 
 
