@@ -1,0 +1,126 @@
+---
+title: "Project - STAT 151A"
+author: "Aditya Jhanwar"
+date: "12/8/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "")
+setwd("~/151A/Project/")
+rm(list=ls())
+library(tidyverse)
+```
+
+```{r load_data}
+load(url("http://www.stat.berkeley.edu/users/nolan/data/baseball2012.rda"))
+baseball = as_tibble(baseball)
+```
+
+# Data Exploration and Feature Creation 
+
+### 1)
+
+The first step is to clean the `baseball` data by removing unecessary explanatory variables and entries missing a `salary (observed Yi)` value.
+
+```{r cleaning.data}
+baseball = baseball %>% select(-c("ID", "yearID", "teamID", "lgID", "nameFirst", "nameLast", "G_batting")) # remove unecessary variables
+baseball = baseball %>% drop_na(salary) # remove units with no salary values
+```
+
+Next, I followed the author's process in creating new features as decribed in the textbook.
+
+```{r derived.vars}
+baseball = baseball %>% mutate(AVG = CH/CAB,
+                               OBP = 100*(CH + CBB)/(CAB + CBB),
+                               CAB.avg  = CAB/years,
+                               CH.avg   = CH/years,
+                               CHR.avg  = CHR/years,
+                               CR.avg   = CR/years,
+                               CRBI.avg = CRBI/years)
+```
+
+Finally, I cleaned the `Position` and `Years` explanatory variables through reimpementing them as dummy variables.
+
+```{r dummy.vars.position}
+new.pos = c()
+MI = c("12", "1S", "23", "2B", "2S", "3S", "O2", "SS")
+C  = c("C", "C1", "OC")
+CF = c("CF")
+  
+# Assign new factor assignment for MI (middle infielders), C (catcher), CF (center field), and O (other)
+for (i in baseball$POS){
+  if      (i %in% MI) { new.pos = c(new.pos, "MI") }
+  else if (i %in% C)  { new.pos = c(new.pos, "C")  }
+  else if (i %in% CF) { new.pos = c(new.pos, "CF") }
+  else                { new.pos = c(new.pos, "O")  }
+}
+
+baseball$POS = relevel(factor(new.pos), "O")
+```
+
+```{r dummy.vars.salary}
+new.years = c()
+neg.cont  = 6
+neg.sal   = 3
+
+for (i in baseball$years){
+  if      (i >= neg.cont) { new.years = c(new.years, "negotiate.contract") }
+  else if (i >= neg.sal)  { new.years = c(new.years, "negotiate.salary")   }
+  else                    { new.years = c(new.years, "other")              }
+}
+
+baseball$years = relevel(factor(new.years), "other")
+```
+
+```{r}
+lm.fit = lm(log(salary) ~ ., data = baseball)
+new.baseball = as_tibble(model.matrix(lm.fit)[,-1])
+new.baseball$salary = baseball$salary
+```
+
+\newpage
+
+### 3)
+
+```{r}
+
+```
+
+\newpage
+
+\newpage
+
+# Data Analysis 
+
+### 1)
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
