@@ -68,8 +68,8 @@ neg.cont  = 6
 neg.sal   = 3
 
 for (i in baseball$years){
-  if      (i >= neg.cont) { new.years = c(new.years, "neg.contract") }
-  else if (i >= neg.sal)  { new.years = c(new.years, "neg.salary")   }
+  if      (i >= neg.cont) { new.years = c(new.years, "neg.cont") }
+  else if (i >= neg.sal)  { new.years = c(new.years, "neg.sal")   }
   else                    { new.years = c(new.years, "other")        }
 }
 
@@ -148,12 +148,7 @@ new.baseball$years = log(new.baseball$years)
 ### 1)
 
 ```{r}
-lm(log(salary) ~ yearsneg.contract +
-     yearsneg.salary + 
-     log(1+CR) + 
-     yearsneg.contract*log(1+CR) + 
-     yearsneg.salary*log(1+CR), 
-   data = new.baseball)
+lm(log(salary) ~ (yrneg.contract + yrneg.salary)*log(1+CR), data=new.baseball)
 ```
 
 
