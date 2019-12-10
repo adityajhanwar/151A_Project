@@ -110,13 +110,17 @@ In addition, I noticed some of the variables have a stronger correlation with th
 Next, I'd like to look into whether the data is distributed normally as per an assumption of guassian distributed errors in linear modelling. 
 
 ```{r salary.hist}
-ggplot(data=new.baseball, aes(x=salary)) + geom_histogram(bins=40)
+sal1 = ggplot(data=new.baseball, aes(x=salary)) + geom_histogram(bins=40) + ggtitle("Histogram of Salary")
+sal2 = ggplot(data=new.baseball, aes(y=salary)) + geom_boxplot() + ggtitle("Bocplot of Salary")
+grid.arrange(sal1, sal2, nrow=1)
 ```
 
 The histogram above shows that the observed outcome values are not distributed normally at all. Hence, some sort of transformation of the data is necessary in order to use linear modelling.
 
 ```{r log.salary.hist}
-ggplot(data=new.baseball, aes(x=log(salary))) + geom_histogram(bins=40)
+log.sal1 = ggplot(data=new.baseball, aes(x=log(salary))) + geom_histogram(bins=40) + ggtitle("Histogram of Salary")
+log.sal2 = ggplot(data=new.baseball, aes(y=log(salary))) + geom_boxplot() +  ggtitle("Boxplot of log(Salary)")
+grid.arrange(log.sal1, log.sal2, nrow=1)
 ```
 
 Fox mentions log transforming the `salary` data in his linear modelling analysis and this is in line with the observed histograms above. The histogram of the original salaries is right skewed whereas the histogram of the log transformed salaries is somewhat more stabilized and appears more so normally distributed in some sense.
@@ -148,7 +152,7 @@ new.baseball$years = log(new.baseball$years)
 ### 1)
 
 ```{r}
-lm(log(salary) ~ (yrneg.contract + yrneg.salary)*log(1+CR), data=new.baseball)
+lm(log(salary) ~ (yrneg.cont + yrneg.sal)*log(1+CR), data=new.baseball)
 ```
 
 
