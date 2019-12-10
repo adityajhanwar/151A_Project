@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE, comment = "")
 setwd("~/151A/Project/")
 rm(list=ls())
 library(tidyverse)
+library(gridExtra)
 ```
 
 ```{r load_data}
@@ -72,10 +73,10 @@ for (i in baseball$years){
   else                    { new.years = c(new.years, "other")        }
 }
 
-baseball$years = relevel(factor(new.years), "other")
+baseball$yr = relevel(factor(new.years), "other")
 ```
 
-```{r}
+```{r final.data}
 lm.fit = lm(salary ~ ., data = baseball)
 new.baseball = as_tibble(model.matrix(lm.fit)[,-1])
 new.baseball$salary = baseball$salary
@@ -96,25 +97,49 @@ Firstly, I'll look at the the structure of the data itself and how the different
 - `CR` = Career runs
 - `CRBI` = Career runs batted in
 
-```{r}
-pairs(salary ~ G.x + InnOuts + PO + E + CAB + CR + CRBI, data = new.baseball)
+```{r pairs.plot}
+pairs(salary ~ G.x + InnOuts + PO + E + CAB + CR + CRBI, data=new.baseball)
 ```
 
 From observing the paired structures of data it is evident that some features are uncorrelated whereas others are strongly correlated. However, this is mostly expected as certain features relate to one another. For example, a player's career at bats would be associated with his career runs or career runs batted in since all tie into a players capability of scoring bases.
 
 This indicates a possible issue in inference of coefficients through linear modeling since the standard error calculation will be grossly inflated.
 
+In addition, I noticed some of the variables have a stronger correlation with the salary than that of other variables. For example, `G.x` and `InnOuts` do not seem to have a strong association with `salary` whereas `CAB`, `CR`, and `CRBI` have comparitively stronger correlations with `salary`. This indicates some sort of variable selection and model pruning may be of benefit.
+
 Next, I'd like to look into whether the data is distributed normally as per an assumption of guassian distributed errors in linear modelling. 
 
-```{r}
-ggplot(data = new.baseball, aes(x = salary)) + geom_histogram(bins = 40)
+```{r salary.hist}
+ggplot(data=new.baseball, aes(x=salary)) + geom_histogram(bins=40)
 ```
 
 The histogram above shows that the observed outcome values are not distributed normally at all. Hence, some sort of transformation of the data is necessary in order to use linear modelling.
 
-```{r}
-ggplot(data = new.baseball, aes(x = log(salary))) + geom_histogram(bins = 40)
+```{r log.salary.hist}
+ggplot(data=new.baseball, aes(x=log(salary))) + geom_histogram(bins=40)
 ```
+
+Fox mentions log transforming the `salary` data in his linear modelling analysis and this is in line with the observed histograms above. The histogram of the original salaries is right skewed whereas the histogram of the log transformed salaries is somewhat more stabilized and appears more so normally distributed in some sense.
+
+Fox also suggests log transforming some feature variables (years in the majors, career-at-bats) through preliminary examination and so I will do the same to carry forward analysis in a similar manner. An argument for why this may be benefificial is that it might garner a stronger linear relationship between the seemingly most influential explanatory variables and the salary and thus improving the model's predictive capability overall.
+
+```{r cab.vs.salary}
+cab.plot1 = ggplot(data=new.baseball, aes(x=CAB, y=log(years))) + geom_point() + ggtitle(label = "Career-At-Bats vs Log(Salary)")
+cab.plot2 = ggplot(data=new.baseball, aes(x=log(CAB), y=log(years))) + geom_point() + ggtitle(label = "Log(Career-At-Bats) vs Log(Salary)")
+grid.arrange(cab.plot1, cab.plot2, nrow=1)
+```
+
+```{r years.vs.salary}
+yrs.plot1 = ggplot(data=new.baseball, aes(x=years, y=log(years))) + geom_point() + ggtitle(label = "Years in Majors vs Log(Salary)")
+yrs.plot2 = ggplot(data=new.baseball, aes(x=log(years), y=log(years))) + geom_point() + ggtitle(label = "Log(Years in Majors) vs Log(Salary)")
+grid.arrange(yrs.plot1, yrs.plot2, nrow=1)
+```
+
+```{r log.transform.features}
+new.baseball$CAB   = log(new.baseball$CAB)
+new.baseball$years = log(new.baseball$years)
+```
+
 
 \newpage
 
