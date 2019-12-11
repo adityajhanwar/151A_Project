@@ -11,6 +11,8 @@ setwd("~/151A/Project/")
 rm(list=ls())
 library(tidyverse)
 library(gridExtra)
+library(car)
+library(MASS)
 ```
 
 ```{r load_data}
@@ -25,7 +27,7 @@ baseball = as_tibble(baseball)
 The first step is to clean the `baseball` data by removing unecessary explanatory variables and entries missing a `salary (observed Yi)` value.
 
 ```{r cleaning.data}
-baseball = baseball %>% select(-c("ID", "yearID", "teamID", "lgID", "nameFirst", "nameLast", "G_batting")) # remove unecessary variables
+baseball = baseball %>% dplyr::select(-c("ID", "yearID", "teamID", "lgID", "nameFirst", "nameLast", "G_batting")) # remove unecessary variables
 baseball = baseball %>% drop_na(salary) # remove units with no salary values
 ```
 
@@ -68,12 +70,12 @@ neg.cont  = 6
 neg.sal   = 3
 
 for (i in baseball$years){
-  if      (i >= neg.cont) { new.years = c(new.years, "neg.cont") }
-  else if (i >= neg.sal)  { new.years = c(new.years, "neg.sal")   }
+  if      (i >= neg.cont) { new.years = c(new.years, ".cont") }
+  else if (i >= neg.sal)  { new.years = c(new.years, ".sal")   }
   else                    { new.years = c(new.years, "other")        }
 }
 
-baseball$yr = relevel(factor(new.years), "other")
+baseball$neg = relevel(factor(new.years), "other")
 ```
 
 ```{r final.data}
@@ -111,14 +113,14 @@ Next, I'd like to look into whether the data is distributed normally as per an a
 
 ```{r salary.hist}
 sal1 = ggplot(data=new.baseball, aes(x=salary)) + geom_histogram(bins=40) + ggtitle("Histogram of Salary")
-sal2 = ggplot(data=new.baseball, aes(y=salary)) + geom_boxplot() + ggtitle("Bocplot of Salary")
+sal2 = ggplot(data=new.baseball, aes(y=salary)) + geom_boxplot() + ggtitle("Boxplot of Salary")
 grid.arrange(sal1, sal2, nrow=1)
 ```
 
 The histogram above shows that the observed outcome values are not distributed normally at all. Hence, some sort of transformation of the data is necessary in order to use linear modelling.
 
 ```{r log.salary.hist}
-log.sal1 = ggplot(data=new.baseball, aes(x=log(salary))) + geom_histogram(bins=40) + ggtitle("Histogram of Salary")
+log.sal1 = ggplot(data=new.baseball, aes(x=log(salary))) + geom_histogram(bins=40) + ggtitle("Histogram of log(Salary)")
 log.sal2 = ggplot(data=new.baseball, aes(y=log(salary))) + geom_boxplot() +  ggtitle("Boxplot of log(Salary)")
 grid.arrange(log.sal1, log.sal2, nrow=1)
 ```
@@ -127,21 +129,23 @@ Fox mentions log transforming the `salary` data in his linear modelling analysis
 
 Fox also suggests log transforming some feature variables (years in the majors, career-at-bats) through preliminary examination and so I will do the same to carry forward analysis in a similar manner. An argument for why this may be benefificial is that it might garner a stronger linear relationship between the seemingly most influential explanatory variables and the salary and thus improving the model's predictive capability overall.
 
-```{r cab.vs.salary}
+```{r cab.vs.salary.plot}
 cab.plot1 = ggplot(data=new.baseball, aes(x=CAB, y=log(years))) + geom_point() + ggtitle(label = "Career-At-Bats vs Log(Salary)")
 cab.plot2 = ggplot(data=new.baseball, aes(x=log(CAB), y=log(years))) + geom_point() + ggtitle(label = "Log(Career-At-Bats) vs Log(Salary)")
 grid.arrange(cab.plot1, cab.plot2, nrow=1)
 ```
 
-```{r years.vs.salary}
+```{r years.vs.salary.plot}
 yrs.plot1 = ggplot(data=new.baseball, aes(x=years, y=log(years))) + geom_point() + ggtitle(label = "Years in Majors vs Log(Salary)")
 yrs.plot2 = ggplot(data=new.baseball, aes(x=log(years), y=log(years))) + geom_point() + ggtitle(label = "Log(Years in Majors) vs Log(Salary)")
 grid.arrange(yrs.plot1, yrs.plot2, nrow=1)
 ```
 
 ```{r log.transform.features}
-new.baseball$CAB   = log(new.baseball$CAB)
-new.baseball$years = log(new.baseball$years)
+new.baseball$log.CAB    = log(new.baseball$CAB)
+new.baseball$log.years  = log(new.baseball$years)
+new.baseball$log.salary = log(new.baseball$salary)
+new.baseball = new.baseball %>% dplyr::select(-c(CAB, years, salary))
 ```
 
 
@@ -151,17 +155,73 @@ new.baseball$years = log(new.baseball$years)
 
 ### 1)
 
+For the first of the project, I will be fitting a simple model that predicts `log(salary)` from the **dummy variables** for `years in majors` and `log(career runs)`, allowing for an interactio between the feature variables.
+
+```{r simple.model}
+dat1 = new.baseball %>% dplyr::select(log.salary, CR, neg.sal, neg.cont)
+simple.model = lm(log.salary ~ log(1+CR)*(neg.cont + neg.sal), data=dat1)
+simple.model
+```
+
+Although I have fitted the simple model above, I want to check for any outliers, high leverage points, and influential observations for further evaulation of the simple model. All criterions in determining such observations will be in line with what Fox suggests using.
+
+```{r simple.model.infl}
+hat.vals = hatvalues(simple.model)
+stud.res = studres(simple.model)
+cook.dis = cooks.distance(simple.model)
+
+measures = tibble(hat.vals, stud.res, cook.dis)
+```
+
+First, I'd like to take a look at the **high leverage** points, which are observations with explanatory variables markedly different from that of the average. In terms of numerical cutoffs for diagnostic statistics, _hat values exceeding **twice** the average hat value_ `(k+1)/n` _are noteworthy._
+
 ```{r}
-lm(log(salary) ~ (yrneg.cont + yrneg.sal)*log(1+CR), data=new.baseball)
+h.3 = 3*length(simple.model$coefficients)/nrow(new.baseball)
+high.leverage = measures[hat.vals > h.3,]
+high.leverage
+```
+
+There appears to be **_17_** data points which have a relatively high leverage. 
+
+In addition to high leverage points, I'll analyze discrepant observations to detect outliers within the data through utilizing **studentized residuals** with a numerical cutoff of `|t-test statistic| > 2`
+
+```{r}
+outliers = measures[abs(stud.res) > 2,]
+outliers %>% head(n=5)
+```
+
+There are **_26_** observations which are determined to be outliers. 
+
+Although I have determined observations that have high leverage or are outliers, what I am most conerned about are the subset of these points which have an influence on the determined coefficients of the model. Such points greatly alter the predictive capability of the simple model and thus cannot be overlooked.
+
+Through recommendation by Fox, the criterion I will be using to determine highly influential points is `D_i > 4/(n-k-1)`
+
+```{r}
+cook.cutoff = 4/(nrow(new.baseball)-length(simple.model$coefficients))
+influential.points = measures[cook.dis > cook.cutoff,]
+influential.points
+```
+
+It appears there are **_16_** influential points within the dataset.
+
+-------
+
+```{r simple.model.hat.vs.studres}
+dat = tibble(hat.vals, stud.res, cook.dis)
+ggplot(aes(x=hat.vals, y=stud.res, size=cook.dis), data=dat) + 
+  geom_point(alpha=0.4) + scale_size(range=c(0, 15)) + 
+  geom_vline(xintercept = 3*6/421, color='red', alpha=.7, linetype = "dashed") +
+  geom_hline(yintercept = -2, color='red', alpha=.7, linetype = "dashed") + 
+  geom_hline(yintercept = 2, color='red', alpha=.7, linetype = "dashed")
+# influencePlot(simple.model)
 ```
 
 
 
-
-
-
-
-
+```{r}
+inf.outliers = influencePlot(simple.model)
+inf.outliers
+```
 
 
 
