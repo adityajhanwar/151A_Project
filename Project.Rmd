@@ -13,6 +13,7 @@ library(tidyverse)
 library(gridExtra)
 library(car)
 library(MASS)
+library(leaps)
 ```
 
 ```{r load_data}
@@ -163,12 +164,16 @@ simple.model = lm(log.salary ~ log(1+CR)*(neg.cont + neg.sal), data=dat1)
 simple.model
 ```
 
+### 2)
+
 Although I have fitted the simple model above, I want to check for any outliers, high leverage points, and influential observations for further evaulation of the simple model. All criterions in determining such observations will be in line with what Fox suggests using.
 
 ```{r simple.model.infl}
 hat.vals = hatvalues(simple.model)
 stud.res = studres(simple.model)
 cook.dis = cooks.distance(simple.model)
+
+measures = tibble(Hat.Values=hat.vals, Studentized.Residuals=stud.res, Cooks.Distance=cook.dis)
 ```
 
 First, I'd like to take a look at the **high leverage** points, which are observations with explanatory variables markedly different from that of the average. In terms of numerical cutoffs for diagnostic statistics, _hat values exceeding **twice** the average hat value_ `(k+1)/n` _are noteworthy._
@@ -197,7 +202,7 @@ Through recommendation by Fox, the criterion I will be using to determine highly
 ```{r}
 cook.cutoff = 4/(nrow(new.baseball)-length(simple.model$coefficients))
 influential.points = measures[cook.dis > cook.cutoff,]
-influential.points %>% arrange(desc(cook.dis))
+influential.points %>% arrange(desc(Cooks.Distance))
 ```
 
 It appears there are **_16_** influential points within the dataset. I'm not very surprised as players' baseball data is incredibly varied and prone to uniquely performing individuals, thus causing there to be influential observations.
@@ -207,14 +212,37 @@ To better grasp the idea behind the information produced above, the following is
 **Note**: The horizontal line represents `3 times the average hat value` and the 2 vertical lines mark `t-test statistics of -2 and 2`.
 
 ```{r simple.model.hat.vs.studres}
-dat = tibble(Hat.Values=hat.vals, Studentized.Residuals=stud.res, Cooks.Distance=cook.dis)
+measures = tibble(Hat.Values=hat.vals, Studentized.Residuals=stud.res, Cooks.Distance=cook.dis)
 
-ggplot(aes(x=Hat.Values, y=Studentized.Residuals, size=Cooks.Distance), data=dat) + 
+ggplot(aes(x=Hat.Values, y=Studentized.Residuals, size=Cooks.Distance), data=measures) + 
   geom_point(alpha=0.4) + scale_size(range=c(0, 15)) + 
   geom_vline(xintercept = 3*6/421, color='red', alpha=.7, linetype = "dashed") +
   geom_hline(yintercept = -2, color='red', alpha=.7, linetype = "dashed") + 
   geom_hline(yintercept = 2, color='red', alpha=.7, linetype = "dashed")
 ```
+
+### 3)
+
+```{r}
+all.fit = lm(log.salary ~ ., data = new.baseball)
+summary(all.fit)
+```
+
+From former analysis I am aware of collinearity within the explanatory variables and hence inflated standard errors. However, it appears several of the coefficients are statistically significant and that the omnibus F-statistic for all explanatory variables in the model having coefficients of 0 is also statistically significant. In addition, the adjusted R-squared value is significantly lower than R-squared. This all leans toward the argument of possible variable selection that may improve the model's regression ability.
+
+### 4)
+
+
+
+### 5)
+
+
+
+### 6)
+
+
+
+### 7) 
 
 
 
