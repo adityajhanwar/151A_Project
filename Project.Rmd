@@ -169,8 +169,6 @@ Although I have fitted the simple model above, I want to check for any outliers,
 hat.vals = hatvalues(simple.model)
 stud.res = studres(simple.model)
 cook.dis = cooks.distance(simple.model)
-
-measures = tibble(hat.vals, stud.res, cook.dis)
 ```
 
 First, I'd like to take a look at the **high leverage** points, which are observations with explanatory variables markedly different from that of the average. In terms of numerical cutoffs for diagnostic statistics, _hat values exceeding **twice** the average hat value_ `(k+1)/n` _are noteworthy._
@@ -199,36 +197,24 @@ Through recommendation by Fox, the criterion I will be using to determine highly
 ```{r}
 cook.cutoff = 4/(nrow(new.baseball)-length(simple.model$coefficients))
 influential.points = measures[cook.dis > cook.cutoff,]
-influential.points
+influential.points %>% arrange(desc(cook.dis))
 ```
 
-It appears there are **_16_** influential points within the dataset.
+It appears there are **_16_** influential points within the dataset. I'm not very surprised as players' baseball data is incredibly varied and prone to uniquely performing individuals, thus causing there to be influential observations.
 
--------
+To better grasp the idea behind the information produced above, the following is a plot of the `hat` values representing the leverage with relation to the `studentized residuals`. Each circle represents an obervation with it's area proportional to it's calculated `Cook's Distance`.
+
+**Note**: The horizontal line represents `3 times the average hat value` and the 2 vertical lines mark `t-test statistics of -2 and 2`.
 
 ```{r simple.model.hat.vs.studres}
-dat = tibble(hat.vals, stud.res, cook.dis)
-ggplot(aes(x=hat.vals, y=stud.res, size=cook.dis), data=dat) + 
+dat = tibble(Hat.Values=hat.vals, Studentized.Residuals=stud.res, Cooks.Distance=cook.dis)
+
+ggplot(aes(x=Hat.Values, y=Studentized.Residuals, size=Cooks.Distance), data=dat) + 
   geom_point(alpha=0.4) + scale_size(range=c(0, 15)) + 
   geom_vline(xintercept = 3*6/421, color='red', alpha=.7, linetype = "dashed") +
   geom_hline(yintercept = -2, color='red', alpha=.7, linetype = "dashed") + 
   geom_hline(yintercept = 2, color='red', alpha=.7, linetype = "dashed")
-# influencePlot(simple.model)
 ```
-
-
-
-```{r}
-inf.outliers = influencePlot(simple.model)
-inf.outliers
-```
-
-
-
-
-
-
-
 
 
 
