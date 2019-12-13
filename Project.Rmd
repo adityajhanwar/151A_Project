@@ -12,9 +12,8 @@ rm(list=ls())
 set.seed(999)
 
 library(tidyverse)
-library(gridExtra)
-library(car)
-library(MASS)
+library(gridExtra) # grid.arrange()
+library(MASS) # studres()
 library(leaps)
 library(caret)
 library(glmnet)
@@ -32,7 +31,8 @@ baseball = as_tibble(baseball)
 The first step is to clean the `baseball` data by removing unecessary explanatory variables and entries missing a `salary (observed Yi)` value.
 
 ```{r cleaning.data}
-baseball = baseball %>% dplyr::select(-c("ID", "yearID", "teamID", "lgID", "nameFirst", "nameLast", "G_batting")) # remove unecessary variables
+baseball = baseball %>% dplyr::select(-c("ID", "yearID", "teamID", "lgID", "nameFirst", 
+                                         "nameLast", "G_batting")) # remove unecessary variables
 baseball = baseball %>% drop_na(salary) # remove units with no salary values
 ```
 
@@ -58,7 +58,8 @@ MI = c("12", "1S", "23", "2B", "2S", "3S", "O2", "SS")
 C  = c("C", "C1", "OC")
 CF = c("CF")
   
-# Assign new factor assignment for MI (middle infielders), C (catcher), CF (center field), and O (other)
+# Assign new factor assignment for MI (middle infielders), C (catcher), 
+#  CF (center field), and O (other)
 for (i in baseball$POS){
   if      (i %in% MI) { new.pos = c(new.pos, "MI") }
   else if (i %in% C)  { new.pos = c(new.pos, "C")  }
@@ -105,7 +106,7 @@ Firstly, I'll look at the the structure of the data itself and how the different
 - `CRBI` = Career runs batted in
 
 ```{r pairs.plot}
-pairs(salary ~ G.x + InnOuts + PO + E + CAB + CR + CRBI, data=new.baseball)
+pairs(salary ~ G.x + InnOuts + PO + E + CAB + CR + CRBI, data = new.baseball)
 ```
 
 From observing the paired structures of data it is evident that some features are uncorrelated whereas others are strongly correlated. However, this is mostly expected as certain features relate to one another. For example, a player's career at bats would be associated with his career runs or career runs batted in since all tie into a players capability of scoring bases.
@@ -117,17 +118,29 @@ In addition, I noticed some of the variables have a stronger correlation with th
 Next, I'd like to look into whether the data is distributed normally as per an assumption of guassian distributed errors in linear modelling. 
 
 ```{r salary.hist}
-sal1 = ggplot(data=new.baseball, aes(x=salary)) + geom_histogram(bins=40) + ggtitle("Histogram of Salary")
-sal2 = ggplot(data=new.baseball, aes(y=salary)) + geom_boxplot() + ggtitle("Boxplot of Salary")
-grid.arrange(sal1, sal2, nrow=1)
+sal1 = ggplot(data = new.baseball, aes(x = salary)) + 
+  geom_histogram(bins = 40) + 
+  ggtitle("Histogram of Salary")
+
+sal2 = ggplot(data=new.baseball, aes(y = salary)) + 
+  geom_boxplot() + 
+  ggtitle("Boxplot of Salary")
+
+grid.arrange(sal1, sal2, nrow = 1)
 ```
 
 The histogram above shows that the observed outcome values are not distributed normally at all. Hence, some sort of transformation of the data is necessary in order to use linear modelling.
 
 ```{r log.salary.hist}
-log.sal1 = ggplot(data=new.baseball, aes(x=log(salary))) + geom_histogram(bins=40) + ggtitle("Histogram of log(Salary)")
-log.sal2 = ggplot(data=new.baseball, aes(y=log(salary))) + geom_boxplot() +  ggtitle("Boxplot of log(Salary)")
-grid.arrange(log.sal1, log.sal2, nrow=1)
+log.sal1 = ggplot(data = new.baseball, aes(x = log(salary))) + 
+  geom_histogram(bins=40) + 
+  ggtitle("Histogram of log(Salary)")
+
+log.sal2 = ggplot(data = new.baseball, aes(y = log(salary))) + 
+  geom_boxplot() +
+  ggtitle("Boxplot of log(Salary)")
+
+grid.arrange(log.sal1, log.sal2, nrow = 1)
 ```
 
 Fox mentions log transforming the `salary` data in his linear modelling analysis and this is in line with the observed histograms above. The histogram of the original salaries is right skewed whereas the histogram of the log transformed salaries is somewhat more stabilized and appears more so normally distributed in some sense.
@@ -135,15 +148,27 @@ Fox mentions log transforming the `salary` data in his linear modelling analysis
 Fox also suggests log transforming some feature variables (years in the majors, career-at-bats) through preliminary examination and so I will do the same to carry forward analysis in a similar manner. An argument for why this may be benefificial is that it might garner a stronger linear relationship between the seemingly most influential explanatory variables and the salary and thus improving the model's predictive capability overall.
 
 ```{r cab.vs.salary.plot}
-cab.plot1 = ggplot(data=new.baseball, aes(x=CAB, y=log(years))) + geom_point() + ggtitle(label = "Career-At-Bats vs Log(Salary)")
-cab.plot2 = ggplot(data=new.baseball, aes(x=log(CAB), y=log(years))) + geom_point() + ggtitle(label = "Log(Career-At-Bats) vs Log(Salary)")
-grid.arrange(cab.plot1, cab.plot2, nrow=1)
+cab.plot1 = ggplot(data=new.baseball, aes(x = CAB, y = log(years))) + 
+  geom_point() + 
+  ggtitle(label = "Career-At-Bats vs Log(Salary)")
+
+cab.plot2 = ggplot(data=new.baseball, aes(x = log(CAB), y = log(years))) + 
+  geom_point() + 
+  ggtitle(label = "Log(Career-At-Bats) vs Log(Salary)")
+
+grid.arrange(cab.plot1, cab.plot2, nrow = 1)
 ```
 
 ```{r years.vs.salary.plot}
-yrs.plot1 = ggplot(data=new.baseball, aes(x=years, y=log(years))) + geom_point() + ggtitle(label = "Years in Majors vs Log(Salary)")
-yrs.plot2 = ggplot(data=new.baseball, aes(x=log(years), y=log(years))) + geom_point() + ggtitle(label = "Log(Years in Majors) vs Log(Salary)")
-grid.arrange(yrs.plot1, yrs.plot2, nrow=1)
+yrs.plot1 = ggplot(data=new.baseball, aes(x = years, y = log(years))) + 
+  geom_point() + 
+  ggtitle(label = "Years in Majors vs Log(Salary)")
+
+yrs.plot2 = ggplot(data=new.baseball, aes(x = log(years), y = log(years))) + 
+  geom_point() + 
+  ggtitle(label = "Log(Years in Majors) vs Log(Salary)")
+
+grid.arrange(yrs.plot1, yrs.plot2, nrow = 1)
 ```
 
 ```{r log.transform.features}
@@ -164,7 +189,7 @@ For the first of the project, I will be fitting a simple model that predicts `lo
 
 ```{r simple.model}
 dat1 = new.baseball %>% dplyr::select(log.salary, CR, neg.sal, neg.cont)
-simple.model = lm(log.salary ~ log(1+CR)*(neg.cont + neg.sal), data=dat1)
+simple.model = lm(log.salary ~ log(1+CR)*(neg.cont + neg.sal), data = dat1)
 simple.model
 ```
 
@@ -179,7 +204,9 @@ hat.vals = hatvalues(simple.model)
 stud.res = studres(simple.model)
 cook.dis = cooks.distance(simple.model)
 
-measures = tibble(Hat.Values=hat.vals, Studentized.Residuals=stud.res, Cooks.Distance=cook.dis)
+measures = tibble(Hat.Values = hat.vals, 
+                  Studentized.Residuals = stud.res, 
+                  Cooks.Distance = cook.dis)
 ```
 
 First, I'd like to take a look at the **high leverage** points, which are observations with explanatory variables markedly different from that of the average. In terms of numerical cutoffs for diagnostic statistics, _hat values exceeding **twice** the average hat value_ `(k+1)/n` _are noteworthy._
@@ -187,7 +214,7 @@ First, I'd like to take a look at the **high leverage** points, which are observ
 ```{r simple.model.infl}
 h.3 = 3*length(simple.model$coefficients)/nrow(new.baseball)
 high.leverage = measures[hat.vals > h.3,]
-high.leverage
+high.leverage %>% head(n = 5)
 ```
 
 There appears to be **_17_** data points which have a relatively high leverage. 
@@ -196,7 +223,7 @@ In addition to high leverage points, I'll analyze discrepant observations to det
 
 ```{r simple.model.outlier}
 outliers = measures[abs(stud.res) > 2,]
-outliers %>% head(n=5)
+outliers %>% head(n = 5)
 ```
 
 There are **_26_** observations which are determined to be outliers. 
@@ -218,13 +245,11 @@ To better grasp the idea behind the information produced above, the following is
 **Note**: The horizontal line represents `3 times the average hat value` and the 2 vertical lines mark `t-test statistics of -2 and 2`.
 
 ```{r simple.model.hat.vs.studres}
-measures = tibble(Hat.Values=hat.vals, Studentized.Residuals=stud.res, Cooks.Distance=cook.dis)
-
-ggplot(aes(x=Hat.Values, y=Studentized.Residuals, size=Cooks.Distance), data=measures) + 
-  geom_point(alpha=0.4) + scale_size(range=c(0, 15)) + 
-  geom_vline(xintercept = 3*6/421, color='red', alpha=.7, linetype = "dashed") +
-  geom_hline(yintercept = -2, color='red', alpha=.7, linetype = "dashed") + 
-  geom_hline(yintercept = 2, color='red', alpha=.7, linetype = "dashed")
+ggplot(aes(x = Hat.Values, y = Studentized.Residuals, size = Cooks.Distance), data = measures) + 
+  geom_point(alpha=0.4) + scale_size(range = c(0, 15)) + 
+  geom_vline(xintercept = 3*6/421, color = 'red', alpha = .7, linetype = "dashed") +
+  geom_hline(yintercept = -2, color='red', alpha = .7, linetype = "dashed") + 
+  geom_hline(yintercept = 2, color='red', alpha = .7, linetype = "dashed")
 ```
 
 Lastly, I'd like to take a look at these influential points and observe the feature values.
@@ -253,7 +278,11 @@ From former analysis I am aware of collinearity within the explanatory variables
 Next, I'll be finding the best **10** models for each model size using **forward selection**. I won't output the results of the summary as they are a bit extensive and in anyways I will select 5 specific models from all of these models in the next part.
 
 ```{r top10.subset}
-best10 = regsubsets(log.salary ~ ., data=new.baseball, nvmax=43, nbest=10, method="forward")
+best10 = regsubsets(log.salary ~ ., 
+                    data   = new.baseball, 
+                    nvmax  = 43, 
+                    nbest  = 10, 
+                    method = "forward")
 # summary(best10)
 ```
 
@@ -291,27 +320,31 @@ train.control = trainControl(method = "cv", number = 10)
 mean.mse = c()
 
 for (i in 1:5){
-  model.to.train.test  = as.formula(paste("log.salary ~", paste(models[[i]], collapse=" + ")))
-  model.trained.tested = train(model.to.train.test, data = new.baseball, method = "lm", trControl = train.control) 
+  model.to.train.test  = as.formula(paste("log.salary ~", 
+                                          paste(models[[i]], collapse=" + ")))
+  model.trained.tested = train(model.to.train.test,
+                               data = new.baseball, 
+                               method = "lm", 
+                               trControl = train.control) 
   mean.mse =  c(mean.mse, model.trained.tested$results[[2]]**2)
 
-  cat(sprintf("Model %d:", i))
-  cat(sprintf("\nBIC: %f", lowest5.bic[i]))
-  cat(sprintf("\nFeatures: %s", paste(models[[i]], collapse = ", ")))
-  cat(sprintf("\n--> MSE: %f", mean.mse[i]))
-  cat(sprintf("\n\n"))
+  cat(sprintf("Model %d:\nBIC: %f\nFeature: %s\n--> MSE: %f\n\n", 
+            i, 
+            lowest5.bic[i], 
+            paste(models[[i]], collapse = ", "), 
+            mean.mse[i]))
 }
 ```
 
 From the values above, it is evident the following is the model with the lowest mean-MSE:
 
-```{r}
+```{r best.cv.model}
 i = which.min(mean.mse)
-
-cat(sprintf("Model %d:", i))
-cat(sprintf("\nBIC: %f", lowest5.bic[i]))
-cat(sprintf("\nFeature: %s", models[[i]]))
-cat(sprintf("\n--> MSE: %f", mean.mse[i]))
+cat(sprintf("Model %d:\nBIC: %f\nFeature: %s\n--> MSE: %f", 
+            i, 
+            lowest5.bic[i], 
+            paste(models[[i]], collapse = ", "), 
+            mean.mse[i]))
 ```
 
 Through many repetitions it appears that the choice of model changes (stemming from the variabibity in how data is partitioned in 10-fold CV). It appears that it isn't always the case the model with lowest BIC has the lowest mean-MSE.
@@ -322,7 +355,7 @@ Through many repetitions it appears that the choice of model changes (stemming f
 
 In determining the value of the hyperparameter `lambda` to use for the LASSO model (original feature variables), I will be using 10-fold cross validation with an average MSE for the criterion.
 
-```{r}
+```{r lasso.model}
 X = new.baseball %>% dplyr::select(-c(log.salary)) %>% as.matrix()
 y = new.baseball$log.salary
 
@@ -332,7 +365,7 @@ cv.lasso.model = cv.glmnet(x = X, y = y, alpha = 1, nfolds = 10)
 
 The following is the plot of the `log of the hyperparameter lambda` with respect to the resulting `average MSE`.
 
-```{r}
+```{r plot.lasso.model}
 plot(cv.lasso.model)
 ```
 
@@ -342,21 +375,21 @@ I believe the data intrinsically contains a lot of collinear explanatory variabl
 
 The value of `lambda` I will use for the LASSO model is the following:
 
-```{r}
+```{r lambda}
 best.lasso.lambda = cv.lasso.model$lambda.min
 best.lasso.lambda
 ```
 
 The following is a visualization of how different values of lambda influence the coefficient values of the regression model:
 
-```{r}
+```{r lambda.coef.plot}
 plot(lasso.model, xvar = "lambda", )
 lines(c(best.lasso.lambda, best.lasso.lambda), c(-1, 1), lty = "dashed", lwd = 3)
 ```
 
 Lastly, using the hyperparameter value of lambda specified above, I'd like to analyze which coefficients are retained through implicit variable selection of LASSO.
 
-```{r}
+```{r coef.summary}
 best.lasso.coefs = predict(lasso.model, type = 'coefficients', s = best.lasso.lambda)
 best.lasso.coefs
 ```
@@ -365,21 +398,15 @@ From analyzing the output summary of the LASSO model coefficients, it appears 28
 
 I chose the `lambda` value corresponding to the minimum MSE value for the LASSO model, which is the following value:
 
-```{r}
-min(cv.lasso.model$cvm)
+```{r min.mse.lambda}
+best.lasso.lambda
 ```
 
-In the previous part, I found the top 5 models with the lowest BIC and then used 10-fold cross validation with a mean-MSE criterion to find the lowest MSE model. I'd like compare the that result with the model I determined though LASSO by examining the MSE values.
+In the previous part, I found the top 5 models with the lowest BIC and then used 10-fold cross validation with a mean-MSE criterion to find the best model with the lowest MSE. I'd like compare the that result with the model I determined using LASSO.
 
-```{r}
+```{r compare.mse}
 min(cv.lasso.model$cvm) <= mean.mse
 ```
 
-The expression above compared the MSE of the LASSO model to the other 5 models but it turns out LASSO produces a regression with a higher MSE compared to all.
-
-
-
-
-
-
+The expression above compared the MSE of the LASSO model to the other 5 models but it turns out LASSO produces a regression model with a higher MSE compared to all.
 
