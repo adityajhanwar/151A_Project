@@ -9,11 +9,15 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE, comment = "")
 setwd("~/151A/Project/")
 rm(list=ls())
+set.seed(123)
+
 library(tidyverse)
 library(gridExtra)
 library(car)
 library(MASS)
 library(leaps)
+library(caret)
+library(glmnet)
 ```
 
 ```{r load_data}
@@ -164,11 +168,13 @@ simple.model = lm(log.salary ~ log(1+CR)*(neg.cont + neg.sal), data=dat1)
 simple.model
 ```
 
+\newpage
+
 ### 2)
 
 Although I have fitted the simple model above, I want to check for any outliers, high leverage points, and influential observations for further evaulation of the simple model. All criterions in determining such observations will be in line with what Fox suggests using.
 
-```{r simple.model.infl}
+```{r simple.model.measures}
 hat.vals = hatvalues(simple.model)
 stud.res = studres(simple.model)
 cook.dis = cooks.distance(simple.model)
@@ -178,7 +184,7 @@ measures = tibble(Hat.Values=hat.vals, Studentized.Residuals=stud.res, Cooks.Dis
 
 First, I'd like to take a look at the **high leverage** points, which are observations with explanatory variables markedly different from that of the average. In terms of numerical cutoffs for diagnostic statistics, _hat values exceeding **twice** the average hat value_ `(k+1)/n` _are noteworthy._
 
-```{r}
+```{r simple.model.infl}
 h.3 = 3*length(simple.model$coefficients)/nrow(new.baseball)
 high.leverage = measures[hat.vals > h.3,]
 high.leverage
@@ -188,7 +194,7 @@ There appears to be **_17_** data points which have a relatively high leverage.
 
 In addition to high leverage points, I'll analyze discrepant observations to detect outliers within the data through utilizing **studentized residuals** with a numerical cutoff of `|t-test statistic| > 2`
 
-```{r}
+```{r simple.model.outlier}
 outliers = measures[abs(stud.res) > 2,]
 outliers %>% head(n=5)
 ```
@@ -199,7 +205,7 @@ Although I have determined observations that have high leverage or are outliers,
 
 Through recommendation by Fox, the criterion I will be using to determine highly influential points is `D_i > 4/(n-k-1)`
 
-```{r}
+```{r simple.model.influential}
 cook.cutoff = 4/(nrow(new.baseball)-length(simple.model$coefficients))
 influential.points = measures[cook.dis > cook.cutoff,]
 influential.points %>% arrange(desc(Cooks.Distance))
@@ -221,31 +227,128 @@ ggplot(aes(x=Hat.Values, y=Studentized.Residuals, size=Cooks.Distance), data=mea
   geom_hline(yintercept = 2, color='red', alpha=.7, linetype = "dashed")
 ```
 
+Lastly, I'd like to take a look at these influential points and observe the feature values.
+
+```{r simple.model.infl.points}
+new.baseball[cook.dis > cook.cutoff,]
+```
+
+Through manual obervation of the feature vaues of these influential points it appears that these observation have much higher or lower values for certain features such as `G.x`, `InnOuts`, `PO` compared to those of non-influential points. The table of encompassing Cook's Distance with Leverage Hat Value and Studentized Residuals do a much better job providing insight into why a point is influential, however. 
+
+\newpage
+
 ### 3)
 
-```{r}
+```{r full.fit}
 all.fit = lm(log.salary ~ ., data = new.baseball)
 summary(all.fit)
 ```
 
 From former analysis I am aware of collinearity within the explanatory variables and hence inflated standard errors. However, it appears several of the coefficients are statistically significant and that the omnibus F-statistic for all explanatory variables in the model having coefficients of 0 is also statistically significant. In addition, the adjusted R-squared value is significantly lower than R-squared. This all leans toward the argument of possible variable selection that may improve the model's regression ability.
 
+\newpage
+
 ### 4)
 
+Next, I'll be finding the best **10** models for each model size using forward selection.
 
+```{r top10.subset}
+best10 = regsubsets(log.salary ~ ., data=new.baseball, nvmax=43, nbest=10, method="forward")
+summary(best10)
+```
+
+\newpage
 
 ### 5)
 
+```{r top5.models.bic}
+lowest5.bic  = sort(summary(best10)$bic)[1:5]
+top5.bic.loc = order(summary(best10)$bic)[1:5]
+top5.models  = summary(best10)$which[top5.bic.loc,]
+models = c()
 
+for(i in 1:nrow(top5.models)){
+  cat(sprintf("Model %d:", i))
+  cat(sprintf("\nBIC: %f", lowest5.bic[i]))
+  
+  models = c(models, list(names(which(top5.models[i,]))[-1]))
+  cat(sprintf("\nFeature: %s", models[[i]]))
+  cat("\n\n")
+}
+```
+
+\newpage
 
 ### 6)
 
+Using `BIC` as a criterion may not be sufficient and hence I will use 10-fold cross validation to re-rank the 5 models determined above. Rather than hard-code the k-fold procedure, I will be using built-in functions available in the `caret` package.
 
+The output will show the features of each model for clarity as well as the previously determined BIC value and the newly determined mean-MSE (through 10-fold CV).
+
+```{r 10.fold.cv}
+# 10-fold cross validation setup
+train.control = trainControl(method = "cv", number = 10)
+mean.mse = c()
+
+for (i in 1:5){
+  model.to.train.test  = as.formula(paste("log.salary ~", paste(models[[i]], collapse=" + ")))
+  model.trained.tested = train(model.to.train.test, data = new.baseball, method = "lm", trControl = train.control) 
+  mean.mse =  c(mean.mse, model.trained.tested$results[[2]]**2)
+
+  cat(sprintf("Model %d:", i))
+  cat(sprintf("\nBIC: %f", lowest5.bic[i]))
+  cat(sprintf("\nFeature: %s", models[[i]]))
+  cat(sprintf("\n--> MSE: %f", mean.mse[i]))
+  cat(sprintf("\n\n"))
+}
+```
+
+
+
+\newpage
 
 ### 7) 
 
+In determining the value of the hyperparameter `lambda` to use for the LASSO model (original feature variables), I will be using 10-fold cross validation with an average MSE for the criterion.
 
+```{r}
+X = new.baseball %>% dplyr::select(-c(log.salary)) %>% as.matrix()
+y = new.baseball$log.salary
 
+lasso.model    = glmnet(x = X, y = y, alpha = 1)
+cv.lasso.model = cv.glmnet(x = X, y = y, alpha = 1, nfolds = 10)
+```
+
+The following is the plot of the `log of the hyperparameter lambda` with respect to the resulting `average MSE`.
+
+```{r}
+plot(cv.lasso.model)
+```
+
+The left-most dashed vertical line in the plot represents the lambda corresponding to the minimum MSE whereas the right-most dashed vertical line represents the lambda 1 standard error away from the min lambda. 
+
+I believe the data intrinsically contains a lot of collinear explanatory variables and would like to reduce the number of features used in model prediction. I believe the lambda corresponding to the minimum MSE would be suitable as it not only performs variable selection through utilizing just 28 feature variables for regression rather than all 43, it also has the lowest MSE out of all other possible lambda hyperparameter values and thus seems to be the best choice in prediction. 
+
+The value of `lambda` I will use for the LASSO model is the following:
+
+```{r}
+best.lasso.lambda = cv.lasso.model$lambda.min
+best.lasso.lambda
+```
+
+The following is a visualization of how different values of lambda influence the coefficient values of the regression model:
+
+```{r}
+plot(lasso.model, xvar = "lambda", )
+lines(c(best.lasso.lambda, best.lasso.lambda), c(-1, 1), lty = "dashed", lwd = 3)
+```
+
+Lastly, using the hyperparameter value of lambda specified above, I'd like to analyze which coefficients are retained through implicit variable selection of LASSO.
+
+```{r}
+best.lasso.coefs = predict(lasso.model, type = 'coefficients', s = best.lasso.lambda)
+best.lasso.coefs
+```
 
 
 
