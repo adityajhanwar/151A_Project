@@ -9,7 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE, comment = "")
 setwd("~/151A/Project/")
 rm(list=ls())
-set.seed(123)
+set.seed(999)
 
 library(tidyverse)
 library(gridExtra)
@@ -244,17 +244,17 @@ all.fit = lm(log.salary ~ ., data = new.baseball)
 summary(all.fit)
 ```
 
-From former analysis I am aware of collinearity within the explanatory variables and hence inflated standard errors. However, it appears several of the coefficients are statistically significant and that the omnibus F-statistic for all explanatory variables in the model having coefficients of 0 is also statistically significant. In addition, the adjusted R-squared value is significantly lower than R-squared. This all leans toward the argument of possible variable selection that may improve the model's regression ability.
+From former analysis I am aware of collinearity within the explanatory variables and hence inflated standard errors. However, it appears several of the coefficients are statistically significant and that the omnibus F-statistic for all explanatory variables in the model having coefficients of 0 is also statistically significant. In addition, the adjusted R-squared value is a bit lower than the R-squared of the model. This all leans toward the argument of the model requiring the explanatory variables but with possible variable selection that may improve the model's regression ability.
 
 \newpage
 
 ### 4)
 
-Next, I'll be finding the best **10** models for each model size using forward selection.
+Next, I'll be finding the best **10** models for each model size using **forward selection**. I won't output the results of the summary as they are a bit extensive and in anyways I will select 5 specific models from all of these models in the next part.
 
 ```{r top10.subset}
 best10 = regsubsets(log.salary ~ ., data=new.baseball, nvmax=43, nbest=10, method="forward")
-summary(best10)
+# summary(best10)
 ```
 
 \newpage
@@ -272,7 +272,7 @@ for(i in 1:nrow(top5.models)){
   cat(sprintf("\nBIC: %f", lowest5.bic[i]))
   
   models = c(models, list(names(which(top5.models[i,]))[-1]))
-  cat(sprintf("\nFeature: %s", models[[i]]))
+  cat(sprintf("\nFeatures: %s", paste(models[[i]], collapse = ", ")))
   cat("\n\n")
 }
 ```
@@ -297,13 +297,24 @@ for (i in 1:5){
 
   cat(sprintf("Model %d:", i))
   cat(sprintf("\nBIC: %f", lowest5.bic[i]))
-  cat(sprintf("\nFeature: %s", models[[i]]))
+  cat(sprintf("\nFeatures: %s", paste(models[[i]], collapse = ", ")))
   cat(sprintf("\n--> MSE: %f", mean.mse[i]))
   cat(sprintf("\n\n"))
 }
 ```
 
+From the values above, it is evident the following is the model with the lowest mean-MSE:
 
+```{r}
+i = which.min(mean.mse)
+
+cat(sprintf("Model %d:", i))
+cat(sprintf("\nBIC: %f", lowest5.bic[i]))
+cat(sprintf("\nFeature: %s", models[[i]]))
+cat(sprintf("\n--> MSE: %f", mean.mse[i]))
+```
+
+Through many repetitions it appears that the choice of model changes (stemming from the variabibity in how data is partitioned in 10-fold CV). It appears that it isn't always the case the model with lowest BIC has the lowest mean-MSE.
 
 \newpage
 
@@ -350,6 +361,21 @@ best.lasso.coefs = predict(lasso.model, type = 'coefficients', s = best.lasso.la
 best.lasso.coefs
 ```
 
+From analyzing the output summary of the LASSO model coefficients, it appears 28 explanatory variables have non-zero coeffients. 
+
+I chose the `lambda` value corresponding to the minimum MSE value for the LASSO model, which is the following value:
+
+```{r}
+min(cv.lasso.model$cvm)
+```
+
+In the previous part, I found the top 5 models with the lowest BIC and then used 10-fold cross validation with a mean-MSE criterion to find the lowest MSE model. I'd like compare the that result with the model I determined though LASSO by examining the MSE values.
+
+```{r}
+min(cv.lasso.model$cvm) <= mean.mse
+```
+
+The expression above compared the MSE of the LASSO model to the other 5 models but it turns out LASSO produces a regression with a higher MSE compared to all.
 
 
 
