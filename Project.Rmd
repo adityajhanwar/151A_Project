@@ -113,7 +113,7 @@ From observing the paired structures of data it is evident that some features ar
 
 This indicates a possible issue in inference of coefficients through linear modeling since the standard error calculation will be grossly inflated.
 
-In addition, I noticed some of the variables have a stronger correlation with the salary than that of other variables. For example, `G.x` and `InnOuts` do not seem to have a strong association with `salary` whereas `CAB`, `CR`, and `CRBI` have comparitively stronger correlations with `salary`. This indicates some sort of variable selection and model pruning may be of benefit.
+In addition, I noticed some of the variables have a stronger correlation with the salary than that of other variables. For example, `G.x` and `InnOuts` do not seem to have a strong association with the other variables whereas `CAB`, `CR`, and `CRBI` have comparitively stronger correlations with each other. This indicates some sort of variable selection and model pruning may be of benefit.
 
 Next, I'd like to look into whether the data is distributed normally as per an assumption of guassian distributed errors in linear modelling. 
 
@@ -122,14 +122,19 @@ sal1 = ggplot(data = new.baseball, aes(x = salary)) +
   geom_histogram(bins = 40) + 
   ggtitle("Histogram of Salary")
 
-sal2 = ggplot(data=new.baseball, aes(y = salary)) + 
+sal2 = ggplot(data = new.baseball, aes(y = salary)) + 
   geom_boxplot() + 
   ggtitle("Boxplot of Salary")
 
-grid.arrange(sal1, sal2, nrow = 1)
+sal3 = ggplot(data = new.baseball, aes(sample=salary)) + 
+  geom_qq() + 
+  geom_qq_line(color = "red") + 
+  ggtitle("qqnorm of Salary")
+
+grid.arrange(sal1, sal2, sal3, nrow = 1)
 ```
 
-The histogram above shows that the observed outcome values are not distributed normally at all. Hence, some sort of transformation of the data is necessary in order to use linear modelling.
+The plots above show that the observed outcome values are not distributed normally. Hence, some sort of transformation of the data is necessary in order to use linear modelling for proper inference.
 
 ```{r log.salary.hist}
 log.sal1 = ggplot(data = new.baseball, aes(x = log(salary))) + 
@@ -140,31 +145,36 @@ log.sal2 = ggplot(data = new.baseball, aes(y = log(salary))) +
   geom_boxplot() +
   ggtitle("Boxplot of log(Salary)")
 
-grid.arrange(log.sal1, log.sal2, nrow = 1)
+log.sal3 = ggplot(data = new.baseball, aes(sample=log(salary))) + 
+  geom_qq() + 
+  geom_qq_line(color = "red") + 
+  ggtitle("qqnorm of log(Salary)")
+
+grid.arrange(log.sal1, log.sal2, log.sal3, nrow = 1)
 ```
 
-Fox mentions log transforming the `salary` data in his linear modelling analysis and this is in line with the observed histograms above. The histogram of the original salaries is right skewed whereas the histogram of the log transformed salaries is somewhat more stabilized and appears more so normally distributed in some sense.
+Fox mentions log transforming the `salary` data in his linear modelling analysis for this data and this is in line with the observed plots above. The histogram of the original salaries is right skewed whereas the histogram of the log transformed salaries is somewhat more stabilized. In addition, the boxplots and qqnorm plots shed more insight into how normality is improved through log transforming the data and so it would be better to use the log transormed salary values as the outcome instead.
 
-Fox also suggests log transforming some feature variables (years in the majors, career-at-bats) through preliminary examination and so I will do the same to carry forward analysis in a similar manner. An argument for why this may be benefificial is that it might garner a stronger linear relationship between the seemingly most influential explanatory variables and the salary and thus improving the model's predictive capability overall.
+Fox also suggests log transforming some feature variables (i.e. years in the majors, career at-bats) through preliminary examination, and so I will do the same to carry forward analysis in a similar manner. An argument for why this may be benefificial is that it might garner a stronger linear relationship between the seemingly most influential explanatory variables and the salary and thus improving the model's predictive capability overall which in turn helps in equalizing the variance.
 
 ```{r cab.vs.salary.plot}
-cab.plot1 = ggplot(data=new.baseball, aes(x = CAB, y = log(years))) + 
+cab.plot1 = ggplot(data = new.baseball, aes(x = CAB, y = log(salary))) + 
   geom_point() + 
-  ggtitle(label = "Career-At-Bats vs Log(Salary)")
+  ggtitle(label = "Career At-Bats vs Log(Salary)")
 
-cab.plot2 = ggplot(data=new.baseball, aes(x = log(CAB), y = log(years))) + 
+cab.plot2 = ggplot(data = new.baseball, aes(x = log(CAB), y = log(salary))) + 
   geom_point() + 
-  ggtitle(label = "Log(Career-At-Bats) vs Log(Salary)")
+  ggtitle(label = "Log(Career At-Bats) vs Log(Salary)")
 
 grid.arrange(cab.plot1, cab.plot2, nrow = 1)
 ```
 
 ```{r years.vs.salary.plot}
-yrs.plot1 = ggplot(data=new.baseball, aes(x = years, y = log(years))) + 
+yrs.plot1 = ggplot(data = new.baseball, aes(x = years, y = log(salary))) + 
   geom_point() + 
   ggtitle(label = "Years in Majors vs Log(Salary)")
 
-yrs.plot2 = ggplot(data=new.baseball, aes(x = log(years), y = log(years))) + 
+yrs.plot2 = ggplot(data = new.baseball, aes(x = log(years), y = log(salary))) + 
   geom_point() + 
   ggtitle(label = "Log(Years in Majors) vs Log(Salary)")
 
@@ -269,7 +279,7 @@ all.fit = lm(log.salary ~ ., data = new.baseball)
 summary(all.fit)
 ```
 
-From former analysis I am aware of collinearity within the explanatory variables and hence inflated standard errors. However, it appears several of the coefficients are statistically significant and that the omnibus F-statistic for all explanatory variables in the model having coefficients of 0 is also statistically significant. In addition, the adjusted R-squared value is a bit lower than the R-squared of the model. This all leans toward the argument of the model requiring the explanatory variables but with possible variable selection that may improve the model's regression ability.
+From former analysis I am aware of collinearity within the explanatory variables and hence inflated standard errors. However, it appears several of the coefficients are statistically significant and that the omnibus F-statistic is also statistically significant. In addition, the adjusted R-squared value is a bit lower than the R-squared of the model. This all leans toward the argument of the model requiring the explanatory variables but with possible variable selection that may improve the model's regression capability.
 
 \newpage
 
