@@ -200,8 +200,29 @@ For the first of the project, I will be fitting a simple model that predicts `lo
 ```{r simple.model}
 dat1 = new.baseball %>% dplyr::select(log.salary, CR, neg.sal, neg.cont)
 simple.model = lm(log.salary ~ log(1+CR)*(neg.cont + neg.sal), data = dat1)
-simple.model
+summary(simple.model)
 ```
+
+The summary output of this simple model presents some interesting insights. All but `log(1 + CR)` have a statistically significant t-statistic and the omnibus F-statistic is statistically significant. 
+
+Since the p-value of the t-test statistic main effect `log(1 + CR)` is not significant whereas the interaction terms involving `log(1 + CR)` are statistically significant, I wanted to test another hypothesis whether `log(1 + CR) = log(1 + CR):neg.cont = log(1 + CR):neg.sal = 0`
+
+```{r subset.model}
+subset.model = lm(log.salary ~ neg.cont + neg.sal, data = dat1)
+summary(subset.model)
+```
+
+```{r f.stat.subset}
+r1 = 0.7008
+r0 = 0.5183
+df1 = 421-5-1
+df2 = 2
+
+f.stat = df1/df2 * (r1-r0)/(1-r1)
+pf(f.stat, df1 = df1, df2 = df2)
+```
+
+The p-value of the F-statistic corresponsing to the null hypothesis specified above is approximately 1, which means we fail to reject the null and perhaps the coeffients for the 3 feature variables should be 0 (and ths omitted from the model) 
 
 \newpage
 
@@ -394,7 +415,7 @@ The following is a visualization of how different values of lambda influence the
 
 ```{r lambda.coef.plot}
 plot(lasso.model, xvar = "lambda", )
-lines(c(best.lasso.lambda, best.lasso.lambda), c(-1, 1), lty = "dashed", lwd = 3)
+lines(c(log(best.lasso.lambda), log(best.lasso.lambda)), c(-1, 1), lty = "dashed", lwd = 3)
 ```
 
 Lastly, using the hyperparameter value of lambda specified above, I'd like to analyze which coefficients are retained through implicit variable selection of LASSO.
